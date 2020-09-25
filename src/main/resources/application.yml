@@ -1,0 +1,6 @@
+micronaut:
+  application:
+    name: elastic-alerts
+---
+elasticsearch:
+  httpHosts: 'http://localhost:9200/'

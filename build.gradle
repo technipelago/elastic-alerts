@@ -1,0 +1,157 @@
+plugins {
+    id "org.asciidoctor.jvm.convert" version "3.1.0"
+    id "com.diffplug.eclipse.apt" version "3.22.0"
+    id "com.github.johnrengelman.shadow" version "6.0.0"
+    id "application"
+}
+
+ext.buildNumber = {
+    def buildNumber = System.getenv('TRAVIS_BUILD_NUMBER') ?: System.getenv('BUILD_NUMBER')
+    if (buildNumber == null || buildNumber.allWhitespace) {
+        buildNumber = '0.0.2'
+        //buildNumber = '1.0.0.BUILD-SNAPSHOT'
+    }
+    return buildNumber
+}
+version = buildNumber()
+
+group "se.technipelago.alerts"
+
+repositories {
+    mavenCentral()
+    jcenter()
+}
+
+configurations {
+    // for dependencies that are needed for development only
+    developmentOnly
+}
+
+dependencies {
+    annotationProcessor(platform("io.micronaut:micronaut-bom:$micronautVersion"))
+    annotationProcessor("io.micronaut:micronaut-inject-java")
+    annotationProcessor("io.micronaut:micronaut-validation")
+    annotationProcessor("io.micronaut.security:micronaut-security-annotations")
+    implementation(platform("io.micronaut:micronaut-bom:$micronautVersion"))
+    implementation("io.micronaut:micronaut-inject")
+    implementation("io.micronaut:micronaut-validation")
+    implementation("io.micronaut:micronaut-runtime")
+    implementation("javax.annotation:javax.annotation-api")
+    implementation("io.micronaut:micronaut-http-server-netty")
+    implementation("io.micronaut:micronaut-http-client")
+    implementation("io.micronaut:micronaut-management")
+    implementation("io.micronaut.security:micronaut-security")
+    implementation("io.micronaut.elasticsearch:micronaut-elasticsearch")
+
+    runtimeOnly("ch.qos.logback:logback-classic")
+
+    testAnnotationProcessor(enforcedPlatform("io.micronaut:micronaut-bom:$micronautVersion"))
+    testAnnotationProcessor("io.micronaut:micronaut-inject-java")
+    testImplementation(enforcedPlatform("io.micronaut:micronaut-bom:$micronautVersion"))
+    testImplementation("org.junit.jupiter:junit-jupiter-api")
+    testImplementation("io.micronaut.test:micronaut-test-junit5")
+    testImplementation(platform("org.testcontainers:testcontainers-bom:1.14.3"))
+    testImplementation("org.testcontainers:elasticsearch")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+    testRuntimeOnly("org.apache.logging.log4j:log4j-to-slf4j:2.8.2")
+}
+
+test.classpath += configurations.developmentOnly
+
+mainClassName = "se.technipelago.alerts.Application"
+
+// use JUnit 5 platform
+test {
+    useJUnitPlatform()
+}
+
+java {
+    sourceCompatibility = JavaVersion.toVersion('11')
+    targetCompatibility = JavaVersion.toVersion('11')
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
+    options.compilerArgs.addAll([
+        '-parameters',
+        // enables incremental compilation
+        '-Amicronaut.processing.incremental=true',
+        '-Amicronaut.processing.annotations=se.technipelago.alerts.*',
+        "-Amicronaut.processing.group=$project.group",
+        "-Amicronaut.processing.module=$project.name",
+    ])
+}
+
+shadowJar {
+    mergeServiceFiles()
+}
+
+tasks.withType(JavaExec) {
+    classpath += configurations.developmentOnly
+    jvmArgs('-XX:TieredStopAtLevel=1', '-Dcom.sun.management.jmxremote')
+    if (gradle.startParameter.continuous) {
+        systemProperties(
+            'micronaut.io.watch.restart':'true',
+            'micronaut.io.watch.enabled':'true',
+            "micronaut.io.watch.paths":"src/main"
+        )
+    }
+}
+
+
+task docker(dependsOn: build) {
+    def repositoryName = System.getenv('DOCKER_REPOSITORY')
+    if(! repositoryName) {
+        throw new org.gradle.api.InvalidUserDataException("Environment variable DOCKER_REPOSITORY not set")
+    }
+    def serviceName = rootProject.name
+    def jarName = "${serviceName}-${version}.jar"
+    def imageName = "${repositoryName}/${serviceName}"
+    def dockerStageDir = new File(project.buildDir, "docker")
+
+    doLast {
+        dockerStageDir.mkdirs()
+        copy {
+            from shadowJar
+            into dockerStageDir
+            rename '.*', jarName
+        }
+        new File(dockerStageDir, "Dockerfile").text = """\
+FROM openjdk:11.0.8-jre
+RUN groupadd -g 1000 elasticsearch && useradd -M -u 1000 -g elasticsearch elasticsearch
+#RUN groupadd -g 1003 gr8crm && useradd -M -u 1003 -g gr8crm gr8crm
+ADD ${jarName} /app.jar
+ENV JAVA_OPTS -Xms128m -Xmx128m -Dmicronaut.environments=docker -Dmicronaut.config.files=/app.yml -Djava.security.egd=file:/dev/./urandom
+USER elasticsearch
+#USER gr8crm
+ENTRYPOINT exec java -jar \$JAVA_OPTS /app.jar
+EXPOSE 8080
+"""
+        exec {
+            workingDir = dockerStageDir
+            commandLine 'docker', 'build', '-t', "${imageName}:${version}", '-t', "${imageName}:latest", '.'
+        }
+        delete dockerStageDir
+    }
+}
+
+task push(dependsOn: docker) {
+    def repositoryName = System.getenv('DOCKER_REPOSITORY')
+    if(! repositoryName) {
+        throw new org.gradle.api.InvalidUserDataException("Environment variable DOCKER_REPOSITORY not set")
+    }
+    def serviceName = rootProject.name
+    def imageName = "${repositoryName}/${serviceName}"
+    doLast {
+        exec {
+            commandLine 'docker', 'push', "${imageName}:${version}"
+        }
+        exec {
+            commandLine 'docker', 'push', "${imageName}:latest"
+        }
+    }
+}
+
+task publishToMavenLocal {} // Empty task to be able to run 'gradle publishToMavenLocal' on every project on this folder
+
+apply from: 'gradle/asciidoc.gradle'

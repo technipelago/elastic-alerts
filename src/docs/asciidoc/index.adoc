@@ -1,0 +1,58 @@
+= Elastic Alerts
+goran@technipelago.se
+
+A service that provide HTTP endpoints that read alerts configured with Kibana.
+
+== Build
+
+This project requires Java 11 (min) and you can build it executing the following command:
+
+[source,console]
+----
+./gradlew build
+----
+
+== Docker
+
+You can create a docker image executing the following command:
+
+[source,console]
+----
+./gradlew docker
+----
+
+== Architecture
+
+The service communicated with Elasticsearch only.
+It reads active alerts from  an index in Elasticsearch.
+
+[plantuml]
+----
+Kibana -> Elasticsearch: Configure alerts in Kibana
+Elasticsearch --> Service: Get active alerts via HTTP endpoint
+----
+
+== Implementation
+
+The service is developed with Micronaut (https://micronaut.io/)
+
+== Configuration
+
+[source,yaml]
+----
+elasticsearch:
+  httpHosts: 'http://localhost:9200/'
+elastic-alerts:
+  elasticsearch:
+    index: kibana-alerts-000001 <1>
+  filter:
+    range: "now-30m"
+  endpoints:
+    username: user
+    password: password <2>
+  status:
+    ok: "UP"
+    alert: "DOWN"
+----
+<1> name of index where Kibana stores alerts
+<2> leave blank to allow anonymous access to endpoints
