@@ -3,6 +3,8 @@ package se.technipelago.alerts;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.rules.SecurityRule;
@@ -28,6 +30,7 @@ public class AlertController {
     }
 
     @Get
+    @ExecuteOn(TaskExecutors.IO)
     public HttpResponse<StatusCheck> check(@Nullable Authentication authentication) {
         if (isAuthenticated(authentication)) {
             Collection<Map<String, Object>> alerts = alertService.getActiveAlerts();
