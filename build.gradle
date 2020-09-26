@@ -8,12 +8,19 @@ plugins {
 ext.buildNumber = {
     def buildNumber = System.getenv('TRAVIS_BUILD_NUMBER') ?: System.getenv('BUILD_NUMBER')
     if (buildNumber == null || buildNumber.allWhitespace) {
-        buildNumber = '0.0.2'
-        //buildNumber = '1.0.0.BUILD-SNAPSHOT'
+        buildNumber = '0.0.3.BUILD-SNAPSHOT'
     }
     return buildNumber
 }
 version = buildNumber()
+
+ext.getImagePrefix = {
+    def repositoryName = System.getenv('DOCKER_REPOSITORY') ?: project.dockerRepository
+    if(repositoryName) {
+        return repositoryName + '/'
+    }
+    return ''
+}
 
 group "se.technipelago.alerts"
 
@@ -74,8 +81,6 @@ tasks.withType(JavaCompile) {
     options.encoding = "UTF-8"
     options.compilerArgs.addAll([
         '-parameters',
-        // enables incremental compilation
-        '-Amicronaut.processing.incremental=true',
         '-Amicronaut.processing.annotations=se.technipelago.alerts.*',
         "-Amicronaut.processing.group=$project.group",
         "-Amicronaut.processing.module=$project.name",
@@ -100,13 +105,9 @@ tasks.withType(JavaExec) {
 
 
 task docker(dependsOn: build) {
-    def repositoryName = System.getenv('DOCKER_REPOSITORY')
-    if(! repositoryName) {
-        throw new org.gradle.api.InvalidUserDataException("Environment variable DOCKER_REPOSITORY not set")
-    }
     def serviceName = rootProject.name
     def jarName = "${serviceName}-${version}.jar"
-    def imageName = "${repositoryName}/${serviceName}"
+    def imageName = "${getImagePrefix()}${serviceName}"
     def dockerStageDir = new File(project.buildDir, "docker")
 
     doLast {
@@ -118,14 +119,12 @@ task docker(dependsOn: build) {
         }
         new File(dockerStageDir, "Dockerfile").text = """\
 FROM openjdk:11.0.8-jre
-RUN groupadd -g 1000 elasticsearch && useradd -M -u 1000 -g elasticsearch elasticsearch
-#RUN groupadd -g 1003 gr8crm && useradd -M -u 1003 -g gr8crm gr8crm
+RUN groupadd -g ${dockerGid ?: '1000'} ${dockerGroup ?: 'elasticsearch'} && useradd -M -u ${dockerUid ?: '1000'} -g ${dockerGroup ?: 'elasticsearch'} ${dockerUser ?: 'elasticsearch'}
 ADD ${jarName} /app.jar
 ENV JAVA_OPTS -Xms128m -Xmx128m -Dmicronaut.environments=docker -Dmicronaut.config.files=/app.yml -Djava.security.egd=file:/dev/./urandom
-USER elasticsearch
-#USER gr8crm
+USER ${dockerUser ?: 'elasticsearch'}
 ENTRYPOINT exec java -jar \$JAVA_OPTS /app.jar
-EXPOSE 8080
+EXPOSE ${dockerPort ?: '8080'}
 """
         exec {
             workingDir = dockerStageDir
@@ -136,12 +135,8 @@ EXPOSE 8080
 }
 
 task push(dependsOn: docker) {
-    def repositoryName = System.getenv('DOCKER_REPOSITORY')
-    if(! repositoryName) {
-        throw new org.gradle.api.InvalidUserDataException("Environment variable DOCKER_REPOSITORY not set")
-    }
     def serviceName = rootProject.name
-    def imageName = "${repositoryName}/${serviceName}"
+    def imageName = "${getImagePrefix()}${serviceName}"
     doLast {
         exec {
             commandLine 'docker', 'push', "${imageName}:${version}"
@@ -151,7 +146,5 @@ task push(dependsOn: docker) {
         }
     }
 }
-
-task publishToMavenLocal {} // Empty task to be able to run 'gradle publishToMavenLocal' on every project on this folder
 
 apply from: 'gradle/asciidoc.gradle'
