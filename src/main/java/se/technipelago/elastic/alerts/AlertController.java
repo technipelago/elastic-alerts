@@ -1,4 +1,4 @@
-package se.technipelago.alerts;
+package se.technipelago.elastic.alerts;
 
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Controller;

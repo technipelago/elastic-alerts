@@ -65,7 +65,7 @@ dependencies {
 
 test.classpath += configurations.developmentOnly
 
-mainClassName = "se.technipelago.alerts.Application"
+mainClassName = "se.technipelago.elastic.alerts.Application"
 
 // use JUnit 5 platform
 test {
@@ -81,7 +81,7 @@ tasks.withType(JavaCompile) {
     options.encoding = "UTF-8"
     options.compilerArgs.addAll([
         '-parameters',
-        '-Amicronaut.processing.annotations=se.technipelago.alerts.*',
+        '-Amicronaut.processing.annotations=se.technipelago.elastic.alerts.*',
         "-Amicronaut.processing.group=$project.group",
         "-Amicronaut.processing.module=$project.name",
     ])

@@ -1,4 +1,4 @@
-package se.technipelago.alerts;
+package se.technipelago.elastic.alerts;
 
 import org.elasticsearch.action.search.ClearScrollRequest;
 import org.elasticsearch.action.search.SearchRequest;
