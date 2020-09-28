@@ -1,5 +1,4 @@
-= Elastic Alerts
-goran@technipelago.se
+= Elastic Alerts - Kibana alerts available via REST endpoint
 
 A service that provide HTTP endpoints that read alerts configured with Kibana.
 
@@ -25,12 +24,6 @@ You can create a docker image executing the following command:
 
 The service communicates with Elasticsearch only.
 It reads active alerts from  an index in Elasticsearch.
-
-[plantuml]
-----
-Kibana -> Elasticsearch: Configure alerts in Kibana
-Elasticsearch --> Service: Get active alerts via HTTP endpoint
-----
 
 == Implementation
 
