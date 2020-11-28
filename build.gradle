@@ -8,7 +8,7 @@ plugins {
 ext.buildNumber = {
     def buildNumber = System.getenv('TRAVIS_BUILD_NUMBER') ?: System.getenv('BUILD_NUMBER')
     if (buildNumber == null || buildNumber.allWhitespace) {
-        buildNumber = '0.0.3'
+        buildNumber = '0.0.4.BUILD-SNAPSHOT'
     }
     return buildNumber
 }
