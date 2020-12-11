@@ -8,7 +8,7 @@ plugins {
 ext.buildNumber = {
     def buildNumber = System.getenv('TRAVIS_BUILD_NUMBER') ?: System.getenv('BUILD_NUMBER')
     if (buildNumber == null || buildNumber.allWhitespace) {
-        buildNumber = '0.0.4.BUILD-SNAPSHOT'
+        buildNumber = '0.0.4'
     }
     return buildNumber
 }
@@ -51,13 +51,14 @@ dependencies {
     implementation("io.micronaut.elasticsearch:micronaut-elasticsearch")
 
     runtimeOnly("ch.qos.logback:logback-classic")
+    runtimeOnly "net.logstash.logback:logstash-logback-encoder:6.4"
 
     testAnnotationProcessor(enforcedPlatform("io.micronaut:micronaut-bom:$micronautVersion"))
     testAnnotationProcessor("io.micronaut:micronaut-inject-java")
     testImplementation(enforcedPlatform("io.micronaut:micronaut-bom:$micronautVersion"))
     testImplementation("org.junit.jupiter:junit-jupiter-api")
     testImplementation("io.micronaut.test:micronaut-test-junit5")
-    testImplementation(platform("org.testcontainers:testcontainers-bom:1.14.3"))
+    testImplementation(platform("org.testcontainers:testcontainers-bom:1.15.0"))
     testImplementation("org.testcontainers:elasticsearch")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     testRuntimeOnly("org.apache.logging.log4j:log4j-to-slf4j:2.8.2")
@@ -118,7 +119,7 @@ task docker(dependsOn: build) {
             rename '.*', jarName
         }
         new File(dockerStageDir, "Dockerfile").text = """\
-FROM openjdk:11.0.8-jre
+FROM openjdk:11.0.9-jre
 RUN groupadd -g ${dockerGid ?: '1000'} ${dockerGroup ?: 'elasticsearch'} && useradd -M -u ${dockerUid ?: '1000'} -g ${dockerGroup ?: 'elasticsearch'} ${dockerUser ?: 'elasticsearch'}
 ADD ${jarName} /app.jar
 ENV JAVA_OPTS -Xms128m -Xmx128m -Dmicronaut.environments=docker -Dmicronaut.config.files=/app.yml -Djava.security.egd=file:/dev/./urandom

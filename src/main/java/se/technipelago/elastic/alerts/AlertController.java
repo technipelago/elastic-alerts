@@ -1,16 +1,18 @@
 package se.technipelago.elastic.alerts;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.rules.SecurityRule;
 
-import javax.annotation.Nullable;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -31,9 +33,12 @@ public class AlertController {
 
     @Get
     @ExecuteOn(TaskExecutors.IO)
-    public HttpResponse<StatusCheck> check(@Nullable Authentication authentication) {
+    public HttpResponse<StatusCheck> check(@Nullable Authentication authentication,
+                                           @Nullable @QueryValue List<String> group,
+                                           @Nullable @QueryValue List<String> tag
+    ) {
         if (isAuthenticated(authentication)) {
-            Collection<Map<String, Object>> alerts = alertService.getActiveAlerts();
+            Collection<Map<String, Object>> alerts = alertService.getActiveAlerts(group, tag);
             return HttpResponse.ok(new StatusCheck(getStatus(alerts), alerts));
         } else {
             return HttpResponse.unauthorized();

@@ -1,5 +1,6 @@
 package se.technipelago.elastic.alerts;
 
+import edu.umd.cs.findbugs.annotations.Nullable;
 import org.elasticsearch.action.search.ClearScrollRequest;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
@@ -7,7 +8,9 @@ import org.elasticsearch.action.search.SearchScrollRequest;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.TermQueryBuilder;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
@@ -42,12 +45,25 @@ public class AlertService {
     }
 
 
-    public List<Map<String, Object>> getActiveAlerts() {
+    public List<Map<String, Object>> getActiveAlerts(@Nullable List<String> groups, @Nullable List<String> tags) {
         SearchRequest request = new SearchRequest(configuration.getElasticsearch().getIndex());
         String range = configuration.getFilter().getRange();
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
-        sourceBuilder.query(QueryBuilders.boolQuery()
-                .filter(QueryBuilders.rangeQuery(TIMESTAMP_FIELD).gte(range)));
+        BoolQueryBuilder query = QueryBuilders.boolQuery()
+                .filter(QueryBuilders.rangeQuery(TIMESTAMP_FIELD).gte(range));
+        if(groups != null && !groups.isEmpty()) {
+            for(String group : groups) {
+                query.should(new TermQueryBuilder("group", group));
+            }
+            query.minimumShouldMatch(1);
+        }
+        if(tags != null && !tags.isEmpty()) {
+            for(String tag : tags) {
+                query.should(new TermQueryBuilder("tags", tag));
+            }
+            query.minimumShouldMatch(1);
+        }
+        sourceBuilder.query(query);
         sourceBuilder.sort(TIMESTAMP_FIELD, SortOrder.DESC);
         sourceBuilder.timeout(new TimeValue(10, TimeUnit.SECONDS));
 
